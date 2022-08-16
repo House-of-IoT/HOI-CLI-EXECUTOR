@@ -8,7 +8,12 @@ use tokio_tungstenite::{
     connect_async, tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream,
 };
 
-use crate::{parser::gather_input_and_route, request_types::HOIActionData, state::MainState};
+use crate::{
+    logging::console::{clear_terminal, log_event},
+    parser::gather_input_and_route,
+    request_types::HOIActionData,
+    state::MainState,
+};
 
 pub async fn connect_and_begin_listening(server_state: Arc<RwLock<MainState>>) -> Result<()> {
     let url_res = url::Url::parse(&server_state.read().await.connection_str);
@@ -57,8 +62,9 @@ pub async fn authenticate(
     if password_send.is_ok() && name_and_type_send.is_ok() && outside_name_send.is_ok() {
         if let Some(msg) = read.next().await {
             if let Ok(msg) = msg {
-                println!("{}", msg);
                 if msg.is_text() && msg.to_string() == "success" {
+                    clear_terminal();
+                    log_event("Connected To Server");
                     return true;
                 }
             }

@@ -9,6 +9,10 @@ use tokio_tungstenite::{tungstenite::protocol::Message, MaybeTlsStream, WebSocke
 
 use crate::{
     client::{execute_action, execute_request},
+    logging::console::{
+        clear_terminal, log_accepted_commands, log_command_parameters,
+        log_current_connection_status, log_unknown_command,
+    },
     state::MainState,
 };
 #[derive(PartialEq)]
@@ -25,6 +29,7 @@ pub async fn gather_input_and_route(
     let input = gather_input().await;
     if let Ok(input_string) = input {
         let command_parameters: Vec<String> = input_string.split(" ").map(String::from).collect();
+        log_command_parameters(&command_parameters);
         // Our commands only follow the following format:
         // -> command_op_code/ data display type
         // -> command_op_code/ data for the request/ data display type
@@ -38,6 +43,25 @@ pub async fn gather_input_and_route(
         // raw -> Raw, with no formatting in the terminal.
         if command_parameters.len() > 0 && command_parameters.len() < 4 {
             // Is the command valid?
+            if command_parameters[0] == "help"
+                || command_parameters[0] == "--help"
+                || command_parameters[0] == "help()"
+            {
+                log_accepted_commands();
+                return Ok(());
+            }
+            if command_parameters[0] == "clear()" {
+                clear_terminal();
+                return Ok(());
+            }
+            if command_parameters[0] == "connection()" {
+                log_current_connection_status(
+                    &server_state.read().await.connection_str,
+                    &server_state.read().await.name,
+                    &server_state.read().await.outside_name,
+                );
+                return Ok(());
+            }
             if server_state
                 .read()
                 .await
@@ -54,9 +78,14 @@ pub async fn gather_input_and_route(
                 let output_result = format_final_result(response, print_style);
                 println!("{}", output_result);
                 println!(" ");
+            } else {
+                log_unknown_command(&command_parameters[0]);
             }
         }
+    } else {
+        println!("Issue Gathering Input");
     }
+
     Ok(())
 }
 
@@ -121,6 +150,7 @@ pub fn require_data_with_command() -> HashSet<String> {
 fn command_to_op_code(code: &str) -> String {
     match code {
         "control" => "bot_control".to_owned(),
+        "contacts" => "contact_list".to_owned(),
         "devices" => "servers_devices".to_owned(),
         "deactivated" => "servers_deactivated_bots".to_owned(),
         "banned" => "servers_banned_ips".to_owned(),
